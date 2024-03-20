@@ -2,6 +2,8 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
+	"glsp/lsp"
 	"glsp/rpc"
 	"log"
 	"os"
@@ -14,13 +16,29 @@ func main() {
 	scanner := bufio.NewScanner(os.Stdin)
 	scanner.Split(rpc.Split)
 	for scanner.Scan() {
-		msg := scanner.Text()
-		handleMessage(logger, msg)
+		msg := scanner.Bytes()
+		method, contents, err := rpc.DecodeMessage(msg)
+		if err != nil {
+			logger.Printf("Got an error: %s", err)
+			continue
+		}
+		handleMessage(logger, method, contents)
 	}
 }
 
-func handleMessage(logger *log.Logger, msg any) {
-	logger.Println(msg)
+// handle method field... top down
+func handleMessage(logger *log.Logger, method string, contents []byte) {
+	logger.Print(string(contents))
+	// logger.Printf("Recive msg with method: %s", method)
+
+	switch method {
+	case "initialize":
+		var request lsp.InitiailizeRequest
+		if err := json.Unmarshal(contents, &request); err != nil {
+			logger.Printf("could not parse %s", err)
+		}
+		logger.Printf("connected to: %s %s", request.Params.ClientInfo.Name, request.Params.ClientInfo.Version)
+	}
 }
 
 func getLogger(filename string) *log.Logger {
@@ -30,5 +48,3 @@ func getLogger(filename string) *log.Logger {
 	}
 	return log.New(logfile, "[glsp] ", log.Lshortfile)
 }
-
-// type SplitFunc func(data []byte, atEOF bool) (advance int, token []byte, err error)
